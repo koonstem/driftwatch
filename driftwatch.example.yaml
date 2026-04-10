@@ -1,0 +1,27 @@
+# driftwatch.example.yaml
+# Copy this file to driftwatch.yaml and adjust to your environment.
+
+version: "1"
+
+defaults:
+  # How often to poll for drift (e.g. 30s, 5m, 1h)
+  interval: 5m
+  # Timeout for each individual check
+  timeout: 30s
+
+sources:
+  # --- Kubernetes example ---
+  - name: prod-kubernetes
+    type: kubernetes
+    path: ./k8s/overlays/production
+    labels:
+      env: production
+      team: platform
+
+  # --- Terraform example ---
+  - name: aws-infra
+    type: terraform
+    path: ./terraform/environments/prod
+    labels:
+      provider: aws
+      env: production

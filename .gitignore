@@ -1,0 +1,13 @@
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+*.test
+*.out
+.env
+vendor/
+*.prof
+coverage.txt
+.DS_Store

@@ -54,6 +54,17 @@ func (d *Detector) Detect(manifest *source.Manifest, containers []runner.Contain
 	return results
 }
 
+// DriftedResults returns only the results where drift was detected.
+func DriftedResults(results []Result) []Result {
+	drifted := make([]Result, 0)
+	for _, r := range results {
+		if r.Drifted {
+			drifted = append(drifted, r)
+		}
+	}
+	return drifted
+}
+
 func indexContainers(containers []runner.ContainerInfo) map[string]runner.ContainerInfo {
 	m := make(map[string]runner.ContainerInfo, len(containers))
 	for _, c := range containers {

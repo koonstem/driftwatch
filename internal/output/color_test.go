@@ -69,3 +69,25 @@ func TestColorizer_Enabled_DifferentCodes(t *testing.T) {
 		t.Error("expected Red and Green to produce different output")
 	}
 }
+
+func TestColorizer_EmptyString(t *testing.T) {
+	cases := []struct {
+		name    string
+		enabled bool
+	}{
+		{"disabled", false},
+		{"enabled", true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := NewColorizer(tc.enabled)
+			if got := c.Red(""); !strings.HasSuffix(got, "") {
+				t.Errorf("unexpected output for empty string: %q", got)
+			}
+			if tc.enabled && strings.Contains(c.Red(""), "hello") {
+				t.Error("empty input should not contain extra text")
+			}
+		})
+	}
+}

@@ -4,28 +4,34 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/driftwatch/internal/config"
+	"github.com/driftwatch/internal/drift"
+	"github.com/driftwatch/internal/output"
+	"github.com/driftwatch/internal/runner"
+	"github.com/driftwatch/internal/source"
 	"github.com/spf13/cobra"
-
-	"github.com/yourorg/driftwatch/internal/config"
-	"github.com/yourorg/driftwatch/internal/drift"
-	"github.com/yourorg/driftwatch/internal/output"
-	"github.com/yourorg/driftwatch/internal/runner"
-	"github.com/yourorg/driftwatch/internal/source"
 )
 
-func runDetect(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load(cfgFile)
+var (
+	configFile   string
+	manifestFile string
+	formatFlag   string
+	failOnDrift  bool
+)
+
+func runDetect(cmd *cobra.Command, _ []string) error {
+	cfg, err := config.Load(configFile)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	manifestPath := cfg.ManifestPath
-	if manifest != "" {
-		manifestPath = manifest
+	manifestPath := manifestFile
+	if manifestPath == "" {
+		manifestPath = cfg.ManifestPath
 	}
 
 	loader := source.NewLoader()
-	svcManifest, err := loader.Load(manifestPath)
+	manifest, err := loader.Load(manifestPath)
 	if err != nil {
 		return fmt.Errorf("loading manifest: %w", err)
 	}
@@ -35,19 +41,19 @@ func runDetect(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating runner: %w", err)
 	}
 
-	containers, err := r.ListContainers()
+	containers, err := r.ListContainers(cmd.Context())
 	if err != nil {
 		return fmt.Errorf("listing containers: %w", err)
 	}
 
 	detector := drift.NewDetector()
-	results := detector.Detect(svcManifest, containers)
+	results := detector.Detect(manifest, containers)
 
-	reporter := drift.NewReporter(results)
-	report := reporter.Build()
+	report := drift.NewReporter().Build(results)
 
-	fmt := output.NewFormatter(outputFmt, os.Stdout)
-	if err := fmt.Write(report); err != nil {
+	fmt := output.Format(formatFlag)
+	formatter := output.NewFormatter(fmt, os.Stdout)
+	if err := formatter.Write(report); err != nil {
 		return fmt.Errorf("writing output: %w", err)
 	}
 

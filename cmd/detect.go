@@ -6,42 +6,43 @@ import (
 
 	"github.com/driftwatch/internal/config"
 	"github.com/driftwatch/internal/drift"
+	"github.com/driftwatch/internal/filter"
 	"github.com/driftwatch/internal/output"
 	"github.com/driftwatch/internal/runner"
 	"github.com/driftwatch/internal/source"
 	"github.com/spf13/cobra"
 )
 
-var (
-	configFile   string
-	manifestFile string
-	formatFlag   string
-	failOnDrift  bool
-)
+func runDetect(cmd *cobra.Command, args []string) error {
+	cfgPath, _ := cmd.Flags().GetString("config")
+	manifestOverride, _ := cmd.Flags().GetString("manifest")
+	format, _ := cmd.Flags().GetString("output")
+	failOnDrift, _ := cmd.Flags().GetBool("fail-on-drift")
 
-func runDetect(cmd *cobra.Command, _ []string) error {
-	cfg, err := config.Load(configFile)
+	getFilterOpts := filter.BindFlags(cmd)
+
+	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	manifestPath := manifestFile
-	if manifestPath == "" {
-		manifestPath = cfg.ManifestPath
+	manifestPath := cfg.ManifestPath
+	if manifestOverride != "" {
+		manifestPath = manifestOverride
 	}
 
-	loader := source.NewLoader()
-	manifest, err := loader.Load(manifestPath)
+	ldr := source.NewLoader()
+	manifest, err := ldr.Load(manifestPath)
 	if err != nil {
 		return fmt.Errorf("loading manifest: %w", err)
 	}
 
-	r, err := runner.New(cfg)
+	run, err := runner.New(cfg)
 	if err != nil {
 		return fmt.Errorf("creating runner: %w", err)
 	}
 
-	containers, err := r.ListContainers(cmd.Context())
+	containers, err := run.ListContainers(cmd.Context())
 	if err != nil {
 		return fmt.Errorf("listing containers: %w", err)
 	}
@@ -49,15 +50,31 @@ func runDetect(cmd *cobra.Command, _ []string) error {
 	detector := drift.NewDetector()
 	results := detector.Detect(manifest, containers)
 
-	report := drift.NewReporter().Build(results)
+	filterOpts := getFilterOpts()
+	results = filter.Filter(results, filterOpts)
 
-	fmt := output.Format(formatFlag)
-	formatter := output.NewFormatter(fmt, os.Stdout)
-	if err := formatter.Write(report); err != nil {
+	reporter := drift.NewReporter(results)
+	report := reporter.Report()
+
+	fmt_ := output.NewFormatter(os.Stdout, format)
+	if err := fmt_.Write(report); err != nil {
 		return fmt.Errorf("writing output: %w", err)
 	}
 
 	exitCoder := output.NewExitCoder(failOnDrift)
 	os.Exit(exitCoder.Code(report))
 	return nil
+}
+
+var detectCmd = &cobra.Command{
+	Use:   "detect",
+	Short: "Detect configuration drift between running containers and manifest",
+	RunE:  runDetect,
+}
+
+func init() {
+	detectCmd.Flags().String("manifest", "", "Override manifest path from config")
+	detectCmd.Flags().String("output", "text", "Output format: text, json, table")
+	detectCmd.Flags().Bool("fail-on-drift", false, "Exit with non-zero code if drift is detected")
+	rootCmd.AddCommand(detectCmd)
 }

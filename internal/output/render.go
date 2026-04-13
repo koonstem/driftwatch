@@ -4,51 +4,61 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/yourorg/driftwatch/internal/drift"
+	"github.com/driftwatch/driftwatch/internal/drift"
 )
 
-// RenderOptions controls how drift results are rendered to output.
+// RenderFormat enumerates the supported output formats.
+type RenderFormat string
+
+const (
+	FormatText     RenderFormat = "text"
+	FormatJSON     RenderFormat = "json"
+	FormatTable    RenderFormat = "table"
+	FormatSummary  RenderFormat = "summary"
+	FormatDiff     RenderFormat = "diff"
+	FormatTemplate RenderFormat = "template"
+)
+
+// RenderOptions configures the Renderer.
 type RenderOptions struct {
-	Format  string
-	Color   bool
-	Verbose bool
-	Writer  io.Writer
+	Format   RenderFormat
+	Color    bool
+	Template TemplateOptions
 }
 
-// Renderer writes drift results in a configured format.
+// Renderer dispatches drift results to the appropriate output writer.
 type Renderer struct {
-	opts      RenderOptions
-	colorizer *Colorizer
+	w    io.Writer
+	opts RenderOptions
 }
 
 // NewRenderer creates a Renderer with the given options.
-func NewRenderer(opts RenderOptions) *Renderer {
-	return &Renderer{
-		opts:      opts,
-		colorizer: NewColorizer(opts.Color),
-	}
+func NewRenderer(w io.Writer, opts RenderOptions) *Renderer {
+	return &Renderer{w: w, opts: opts}
 }
 
-// Render writes the drift report to the configured writer in the chosen format.
-func (r *Renderer) Render(report *drift.Report) error {
+// Render writes results in the configured format.
+func (r *Renderer) Render(results []drift.Result) error {
 	switch r.opts.Format {
-	case "json":
-		return writeJSON(r.opts.Writer, report)
-	case "table":
-		return writeTable(r.opts.Writer, report, r.colorizer)
-	case "diff":
-		w := NewDiffWriter(r.opts.Writer, r.colorizer)
-		w.Write(report)
-		return nil
-	case "summary":
-		sw := NewSummaryWriter(r.opts.Writer, r.colorizer)
-		sw.Write(report)
-		return nil
-	case "text", "":
-		f := NewFormatter(r.opts.Writer, r.colorizer)
-		f.Write(report)
-		return nil
+	case FormatJSON:
+		return writeJSON(r.w, results)
+	case FormatTable:
+		return writeTable(r.w, results, r.opts.Color)
+	case FormatSummary:
+		sw := NewSummaryWriter(r.w)
+		return sw.Write(results)
+	case FormatDiff:
+		dw := NewDiffWriter(r.w, r.opts.Color)
+		return dw.Write(results)
+	case FormatTemplate:
+		tw, err := NewTemplateWriter(r.w, r.opts.Template)
+		if err != nil {
+			return err
+		}
+		return tw.Write(results)
+	case FormatText, "":
+		return writeText(r.w, results, r.opts.Color)
 	default:
-		return fmt.Errorf("unknown output format: %q", r.opts.Format)
+		return fmt.Errorf("renderer: unknown format %q", r.opts.Format)
 	}
 }

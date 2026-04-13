@@ -33,6 +33,9 @@ func NewFormatter(format Format, w io.Writer) *Formatter {
 
 // Write serialises the report to the configured output.
 func (f *Formatter) Write(report *drift.Report) error {
+	if report == nil {
+		return fmt.Errorf("cannot write nil report")
+	}
 	switch f.format {
 	case FormatJSON:
 		return writeJSON(f.out, report)
@@ -43,4 +46,20 @@ func (f *Formatter) Write(report *drift.Report) error {
 	default:
 		return fmt.Errorf("unsupported format: %q", f.format)
 	}
+}
+
+// ValidFormats returns all supported Format values.
+func ValidFormats() []Format {
+	return []Format{FormatText, FormatJSON, FormatTable}
+}
+
+// ParseFormat converts a string to a Format, returning an error if unrecognised.
+func ParseFormat(s string) (Format, error) {
+	f := Format(s)
+	for _, v := range ValidFormats() {
+		if f == v {
+			return f, nil
+		}
+	}
+	return "", fmt.Errorf("unknown format %q: valid options are text, json, table", s)
 }

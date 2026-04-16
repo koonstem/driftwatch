@@ -58,3 +58,13 @@ func TestCompareSnapshots_UnchangedService(t *testing.T) {
 		t.Error("expected no new/changed/resolved services")
 	}
 }
+
+func TestCompareSnapshots_EmptySnapshots(t *testing.T) {
+	prev := snap([]drift.DriftResult{})
+	curr := snap([]drift.DriftResult{})
+
+	diff := CompareSnapshots(prev, curr)
+	if len(diff.New) != 0 || len(diff.Resolved) != 0 || len(diff.Changed) != 0 || len(diff.Unchanged) != 0 {
+		t.Errorf("expected empty diff for empty snapshots, got %+v", diff)
+	}
+}

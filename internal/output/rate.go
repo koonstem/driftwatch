@@ -76,3 +76,13 @@ func (r *RateWriter) refill() {
 		r.lastFil = now
 	}
 }
+
+// Available returns the number of tokens currently available in the bucket.
+// When rate limiting is disabled, it always returns the configured BurstSize.
+func (r *RateWriter) Available() int {
+	if !r.opts.Enabled {
+		return r.opts.BurstSize
+	}
+	r.refill()
+	return r.tokens
+}
